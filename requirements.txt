@@ -1,0 +1,8 @@
+# Bob's Teams Methodz - Requirements
+# Python >= 3.8
+
+# Standard library modules (no external dependencies required for core functionality)
+# The system is built primarily with Python's standard library
+
+# Optional dependencies for extended functionality
+python-dotenv>=1.0.0  # For loading environment variables from .env files
