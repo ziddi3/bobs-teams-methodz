@@ -37,6 +37,7 @@ env/
 # Bob's Teams Methodz specific
 outputs/
 *.log
+.env
 deliverables/*
 !deliverables/.gitkeep
 tasks/*

@@ -301,13 +301,56 @@ You → Describe Task → Bob's Team → Results
 
 ## 🔧 Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/ziddi3/bobs-teams-methodz.git
-cd bobs-teams-methodz
+### Prerequisites
 
-# That's it! No external dependencies!
+- Python 3.8 or higher
+- Git (for cloning the repository)
+
+### Setup Steps
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ziddi3/bobs-teams-methodz.git
+   cd bobs-teams-methodz
+   ```
+
+2. Create your environment file:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your API keys
+   ```
+
+### 🔐 Security & API Keys
+
+Bob's Teams Methodz uses environment variables for sensitive information. This ensures that API keys and authentication tokens are never hardcoded in the codebase.
+
+Create a `.env` file in the project root:
+
+```env
+# GitHub Authentication
+GITHUB_TOKEN=your_github_token_here
+
+# AI Model API Key
+AI_MODEL_API_KEY=your_api_key_here
 ```
+
+⚠️ **IMPORTANT**: Never commit the `.env` file to version control! It's already included in `.gitignore`.
+
+### Loading Environment Variables
+
+```python
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Access your keys
+github_token = os.getenv('GITHUB_TOKEN')
+api_key = os.getenv('AI_MODEL_API_KEY')
+```
+
+**That's it! No external dependencies!**
 
 ---
 
