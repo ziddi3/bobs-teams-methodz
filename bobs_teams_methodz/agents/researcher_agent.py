@@ -1,15 +1,11 @@
 """
-Researcher Agent
+Researcher Agent for Bob's Teams Methodz
 Specializes in web research, data gathering, information extraction
 """
 
 from typing import Dict, Any
 import json
 import os
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ..agent_base import AgentBase
 
@@ -53,20 +49,11 @@ class ResearcherAgent(AgentBase):
     
     def perform_web_search(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Perform web search"""
-        query = task.get("query", "")
+        query = task.get("query", task.get("description", ""))
         num_results = task.get("num_results", 10)
         
         self.log(f"Performing web search for: {query}")
         
-        # Trigger web search - this will be handled by the main system
-        search_results = {
-            "query": query,
-            "results": [],
-            "summary": "",
-            "sources": []
-        }
-        
-        # Save search parameters for the main system to execute
         search_params = {
             "action": "web_search",
             "query": query,
@@ -74,9 +61,7 @@ class ResearcherAgent(AgentBase):
             "task_id": task.get("task_id")
         }
         
-        params_file = os.path.join(self.workspace, "ai_workforce", "context", f"search_{task.get('task_id')}.json")
-        with open(params_file, "w") as f:
-            json.dump(search_params, f, indent=2)
+        self.save_context(f"search_{task.get('task_id')}.json", search_params)
         
         self.log(f"Search parameters saved. Execute: web_search with query '{query}'")
         
@@ -99,9 +84,7 @@ class ResearcherAgent(AgentBase):
             "task_id": task.get("task_id")
         }
         
-        params_file = os.path.join(self.workspace, "ai_workforce", "context", f"scrape_{task.get('task_id')}.json")
-        with open(params_file, "w") as f:
-            json.dump(scrape_params, f, indent=2)
+        self.save_context(f"scrape_{task.get('task_id')}.json", scrape_params)
         
         return {
             "action_required": "web_scrape",
@@ -124,7 +107,6 @@ class ResearcherAgent(AgentBase):
         }
         
         if extraction_type == "summary":
-            # Extract key points from content
             result["extracted_data"] = {
                 "summary": self._generate_summary(content),
                 "key_points": self._extract_key_points(content)
@@ -146,7 +128,6 @@ class ResearcherAgent(AgentBase):
         
         self.log(f"Conducting research on: {topic}")
         
-        # Plan research approach
         research_plan = {
             "topic": topic,
             "approach": [
@@ -155,18 +136,15 @@ class ResearcherAgent(AgentBase):
                 "Extract relevant information",
                 "Synthesize findings"
             ],
-            "required_tasks": []
+            "required_tasks": [
+                {
+                    "task_id": f"{task.get('task_id')}_search_1",
+                    "type": "web_search",
+                    "query": topic,
+                    "description": f"Search information about: {topic}"
+                }
+            ]
         }
-        
-        # Create sub-tasks for research
-        research_plan["required_tasks"] = [
-            {
-                "task_id": f"{task.get('task_id')}_search_1",
-                "type": "web_search",
-                "query": topic,
-                "description": f"Search information about: {topic}"
-            }
-        ]
         
         return {
             "research_plan": research_plan,
@@ -175,19 +153,17 @@ class ResearcherAgent(AgentBase):
     
     def _generate_summary(self, content: str) -> str:
         """Generate summary from content"""
-        # Simple approach: first and last paragraphs
         if not content:
             return ""
         
         paragraphs = content.split("\n\n")
         if len(paragraphs) <= 2:
-            return content[:500] + "..."
+            return content[:500] + "..." if len(content) > 500 else content
         
         return paragraphs[0][:300] + "...\n" + paragraphs[-1][:300]
     
     def _extract_key_points(self, content: str) -> list:
         """Extract key points from content"""
-        # Look for bullet points or numbered lists
         key_points = []
         
         lines = content.split("\n")
@@ -196,7 +172,6 @@ class ResearcherAgent(AgentBase):
             if line.startswith(("-", "•", "*", "1.", "2.", "3.")):
                 key_points.append(line)
             elif len(line) > 50 and len(line) < 200:
-                # Potential key point sentences
                 if any(marker in line for marker in (". ", "! ", "? ")):
                     key_points.append(line)
         
@@ -204,20 +179,16 @@ class ResearcherAgent(AgentBase):
     
     def _extract_entities(self, content: str) -> list:
         """Extract entities from content"""
-        # Simple entity extraction (would be better with NLP)
         entities = {
             "people": [],
             "organizations": [],
             "locations": [],
             "dates": []
         }
-        
-        # This is a placeholder - real implementation would use NLP
         return entities
     
     def _extract_facts(self, content: str) -> list:
         """Extract facts from content"""
-        # Look for factual statements
         facts = []
         
         sentences = content.split(". ")

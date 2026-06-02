@@ -11,9 +11,14 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 import time
 
+from . import config as _config
+
 
 class AgentBase(ABC):
     """Base class for all specialized AI agents"""
+    
+    BRAND = _config.BRAND
+    PACKAGE_DIR = _config.PACKAGE_DIR
     
     def __init__(self, name: str, role: str, capabilities: List[str]):
         self.name = name
@@ -22,27 +27,31 @@ class AgentBase(ABC):
         self.status = "idle"
         self.current_task = None
         self.tasks_completed = []
-        self.workspace = "/workspace"
-        self.brand = "Bob's Teams Methodz"
+        self.workspace = _config.get_workspace()
+        self.brand = self.BRAND
         
     @abstractmethod
     def process_task(self, task: Dict[str, Any], context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Process a task and return results"""
         pass
     
+    def _pkg_path(self, *parts) -> str:
+        """Build a path inside the bobs_teams_methodz package directory"""
+        return os.path.join(self.workspace, self.PACKAGE_DIR, *parts)
+    
     def log(self, message: str, level: str = "info"):
         """Log a message with timestamp"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"[{timestamp}] [{self.name}] [{level.upper()}] {message}"
         
-        log_file = os.path.join(self.workspace, "bobs_teams_methodz", "logs", f"{self.name.lower()}.log")
+        log_file = self._pkg_path("logs", f"{self.name.lower()}.log")
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         
         with open(log_file, "a") as f:
             f.write(log_entry + "\n")
         
         print(log_entry)
-    
+        
     def update_status(self, status: str, task: Optional[str] = None):
         """Update agent status"""
         self.status = status
@@ -51,7 +60,7 @@ class AgentBase(ABC):
         
     def save_result(self, task_id: str, result: Dict[str, Any]):
         """Save task result to file"""
-        results_dir = os.path.join(self.workspace, "ai_workforce", "results")
+        results_dir = self._pkg_path("results")
         os.makedirs(results_dir, exist_ok=True)
         
         result_file = os.path.join(results_dir, f"{task_id}_{self.name.lower()}_result.json")
@@ -71,7 +80,7 @@ class AgentBase(ABC):
     
     def load_context(self, context_file: str) -> Dict[str, Any]:
         """Load context from file"""
-        context_path = os.path.join(self.workspace, "ai_workforce", "context", context_file)
+        context_path = self._pkg_path("context", context_file)
         
         if os.path.exists(context_path):
             with open(context_path, "r") as f:
@@ -81,7 +90,7 @@ class AgentBase(ABC):
     
     def save_context(self, context_file: str, context: Dict[str, Any]):
         """Save context to file"""
-        context_dir = os.path.join(self.workspace, "ai_workforce", "context")
+        context_dir = self._pkg_path("context")
         os.makedirs(context_dir, exist_ok=True)
         
         context_path = os.path.join(context_dir, context_file)
@@ -103,7 +112,6 @@ class AgentBase(ABC):
                 
                 self.log(f"Attempt {attempt + 1} failed: {str(e)}, retrying...", "warning")
                 time.sleep(retry_delay)
-        
         return None
     
     def get_file_content(self, file_path: str) -> str:

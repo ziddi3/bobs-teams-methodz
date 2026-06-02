@@ -1,15 +1,11 @@
 """
-Designer Agent
+Designer Agent for Bob's Teams Methodz
 Specializes in visual design, layouts, and creative work
 """
 
 from typing import Dict, Any, List
 import json
 import os
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ..agent_base import AgentBase
 
@@ -70,19 +66,11 @@ class DesignerAgent(AgentBase):
             "source_file": source_file,
             "size": size,
             "requirements": requirements,
-            "task_id": task.get("task_id")
+            "task_id": task.get("task_id"),
+            "action": "edit_image" if (image_type == "edit" and source_file) else "generate_image"
         }
         
-        # Determine action needed
-        if image_type == "edit" and source_file:
-            image_spec["action"] = "edit_image"
-        else:
-            image_spec["action"] = "generate_image"
-        
-        # Save spec for later use
-        spec_file = os.path.join(self.workspace, "ai_workforce", "context", f"image_spec_{task.get('task_id')}.json")
-        with open(spec_file, "w") as f:
-            json.dump(image_spec, f, indent=2)
+        self.save_context(f"image_spec_{task.get('task_id')}.json", image_spec)
         
         return {
             "action_required": image_spec["action"],
@@ -106,14 +94,11 @@ class DesignerAgent(AgentBase):
             "structure": self._get_layout_structure(layout_type),
             "styles": self._get_style_guidelines(layout_type),
             "file_path": requirements.get("file_path", ""),
-            "task_id": task.get("task_id")
+            "task_id": task.get("task_id"),
+            "needs_creation": True
         }
         
-        layout_spec["needs_creation"] = True
-        
-        spec_file = os.path.join(self.workspace, "ai_workforce", "context", f"layout_spec_{task.get('task_id')}.json")
-        with open(spec_file, "w") as f:
-            json.dump(layout_spec, f, indent=2)
+        self.save_context(f"layout_spec_{task.get('task_id')}.json", layout_spec)
         
         return {
             "action_required": "create_layout",
@@ -157,9 +142,7 @@ class DesignerAgent(AgentBase):
             "task_id": task.get("task_id")
         }
         
-        spec_file = os.path.join(self.workspace, "ai_workforce", "context", f"presentation_spec_{task.get('task_id')}.json")
-        with open(spec_file, "w") as f:
-            json.dump(presentation_spec, f, indent=2)
+        self.save_context(f"presentation_spec_{task.get('task_id')}.json", presentation_spec)
         
         return {
             "action_required": "create_presentation",
@@ -180,7 +163,6 @@ class DesignerAgent(AgentBase):
             "inspiration": []
         }
         
-        # Provide design advice based on task
         if "web" in description.lower():
             design_advice["best_practices"].extend([
                 "Use responsive design",
@@ -222,7 +204,6 @@ class DesignerAgent(AgentBase):
                 "scroll_styling": True
             }
         }
-        
         return structures.get(layout_type, structures["webpage"])
     
     def _get_style_guidelines(self, layout_type: str) -> Dict[str, Any]:
@@ -241,7 +222,6 @@ class DesignerAgent(AgentBase):
             "mobile": ["bottom_navigation", "tabs", "swipe_gestures", "touch_targets"],
             "desktop": ["menus", "toolbars", "panels", "notifications"]
         }
-        
         return components.get(ui_type, components["web"])
     
     def _get_design_principles(self) -> List[str]:
@@ -261,7 +241,6 @@ class DesignerAgent(AgentBase):
             {"slide": 2, "type": "agenda", "content": "Table of contents"}
         ]
         
-        # Add content slides
         for i in range(3, slides_count):
             structure.append({
                 "slide": i,
@@ -269,7 +248,6 @@ class DesignerAgent(AgentBase):
                 "content": f"Content slide {i-2}"
             })
         
-        # Add closing slide
         structure.append({
             "slide": slides_count,
             "type": "closing",

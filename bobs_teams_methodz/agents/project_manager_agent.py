@@ -1,15 +1,11 @@
 """
-Project Manager Agent
+Project Manager Agent for Bob's Teams Methodz
 Coordinates all agents, plans projects, and manages workflow
 """
 
 from typing import Dict, Any, List
 import json
 import os
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ..agent_base import AgentBase
 
@@ -89,10 +85,17 @@ class ProjectManagerAgent(AgentBase):
         deliverables = self._define_deliverables(project_type, phases)
         project_plan["deliverables"] = deliverables
         
-        # Save project plan
-        plan_file = os.path.join(self.workspace, "ai_workforce", "context", f"project_plan_{task.get('task_id')}.json")
-        with open(plan_file, "w") as f:
-            json.dump(project_plan, f, indent=2)
+        # Save project plan using _pkg_path() from base class
+        plan_file = self._pkg_path("context", f"project_plan_{task.get('task_id', 'unknown')}.json")
+        try:
+            os.makedirs(os.path.dirname(plan_file), exist_ok=True)
+            with open(plan_file, "w") as f:
+                json.dump(project_plan, f, indent=2)
+        except (OSError, IOError) as e:
+            self.log(f"Warning: Could not save project plan: {e}", "warn")
+        
+        # Also save via base class context method
+        self.save_context(f"project_plan_{task.get('task_id', 'unknown')}", project_plan)
         
         return {
             "project_plan": project_plan,
@@ -116,15 +119,16 @@ class ProjectManagerAgent(AgentBase):
         }
         
         # Get tasks for current phase
-        if current_phase <= len(project_plan.get("phases", [])):
-            phase_tasks = project_plan["phases"][current_phase - 1].get("tasks", [])
+        phases = project_plan.get("phases", [])
+        if current_phase <= len(phases):
+            phase_tasks = phases[current_phase - 1].get("tasks", [])
             
-            for task in phase_tasks:
-                if task.get("status") == "completed":
-                    coordination_status["completed_tasks"].append(task["task_id"])
+            for t in phase_tasks:
+                if t.get("status") == "completed":
+                    coordination_status["completed_tasks"].append(t.get("task_id", "unknown"))
                 else:
-                    coordination_status["pending_tasks"].append(task["task_id"])
-                    coordination_status["active_agents"].append(task["assigned_agent"])
+                    coordination_status["pending_tasks"].append(t.get("task_id", "unknown"))
+                    coordination_status["active_agents"].append(t.get("assigned_agent", t.get("agent", "Unknown")))
         
         return {
             "coordination_status": coordination_status,
@@ -170,13 +174,15 @@ class ProjectManagerAgent(AgentBase):
         
         for deliverable in deliverables:
             # Check if deliverable exists
-            if deliverable.get("file_path"):
-                if os.path.exists(os.path.join(self.workspace, deliverable["file_path"])):
+            file_path = deliverable.get("file_path")
+            if file_path:
+                full_path = os.path.join(self.workspace, deliverable["file_path"])
+                if os.path.exists(full_path):
                     quality_report["passed"] += 1
                 else:
                     quality_report["failed"] += 1
                     quality_report["issues"].append({
-                        "deliverable": deliverable["name"],
+                        "deliverable": deliverable.get("name", "unknown"),
                         "issue": "File not found"
                     })
         
@@ -227,7 +233,7 @@ class ProjectManagerAgent(AgentBase):
             return "research_project"
         elif any(keyword in goal_lower for keyword in ["content", "writing", "blog", "article"]):
             return "content_creation"
-        elif any(keyword in goal_lower for keyword in ["data", "analytics", "analysis", "insights"]):
+        elif any(keyword in goal_lower for keyword in ["data", "analytics", "insights"]):
             return "data_analysis"
         elif any(keyword in goal_lower for keyword in ["design", "image", "visual", "graphic"]):
             return "design_project"
@@ -338,9 +344,9 @@ class ProjectManagerAgent(AgentBase):
         for phase in phases:
             for task in phase.get("tasks", []):
                 assignments.append({
-                    "task_id": task["task_id"],
-                    "agent": task["agent"],
-                    "phase": phase["phase"]
+                    "task_id": task.get("task_id", "unknown"),
+                    "agent": task.get("agent", "Developer"),
+                    "phase": phase.get("phase", 0)
                 })
         
         return assignments
@@ -349,11 +355,16 @@ class ProjectManagerAgent(AgentBase):
         """Estimate project timeline"""
         total_tasks = sum(len(phase.get("tasks", [])) for phase in phases)
         
+        milestones = []
+        for i, phase in enumerate(phases, 1):
+            phase_name = phase.get("name", f"Phase {i}")
+            milestones.append(f"Phase {i}: {phase_name}")
+        
         timeline = {
             "phases": len(phases),
             "total_tasks": total_tasks,
             "estimated_units": total_tasks * 10,  # Simplified estimation
-            "milestones": [f"Phase {i}: {phase['name']}" for i, phase in enumerate(phases, 1)]
+            "milestones": milestones
         }
         
         return timeline
@@ -363,10 +374,11 @@ class ProjectManagerAgent(AgentBase):
         deliverables = []
         
         for i, phase in enumerate(phases, 1):
-            if phase["name"] == "Execution" or phase["name"] == "Development" or phase["name"] == "Analysis & Reporting":
+            phase_name = phase.get("name", "")
+            if phase_name in ("Execution", "Development", "Analysis & Reporting"):
                 deliverables.append({
                     "phase": i,
-                    "name": f"{phase['name']} Output",
+                    "name": f"{phase_name} Output",
                     "type": "output"
                 })
         

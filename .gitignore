@@ -44,6 +44,13 @@ tasks/*
 !tasks/.gitkeep
 context/*
 !context/.gitkeep
+memory.md
+todo.md
+DEBUG_REPORT.md
+BRANDING_SUMMARY.md
+PROJECT_SUMMARY.md
+QUICKSTART.md
+workflow.txt
 
 # System files
 .DS_Store

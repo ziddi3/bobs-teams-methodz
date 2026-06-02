@@ -1,5 +1,5 @@
 """
-AI Workforce Engine
+Bob's Teams Methodz - Workforce Engine
 Main execution engine that coordinates all agents and manages task execution
 """
 
@@ -7,8 +7,9 @@ import os
 import sys
 import json
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
+from . import config as _config
 from .task_manager import TaskManager, TaskStatus
 from .agents import (
     ResearcherAgent,
@@ -21,18 +22,23 @@ from .agents import (
 
 
 class WorkforceEngine:
-    """Main engine for Bob's Teams coordination"""
+    """Main engine for Bob's Teams Methodz coordination"""
+    
+    BRAND = _config.BRAND
+    TAGLINE = _config.TAGLINE
+    PACKAGE_DIR = _config.PACKAGE_DIR
     
     def __init__(self, keep_in_loop: bool = True):
         self.task_manager = TaskManager()
         self.keep_in_loop = keep_in_loop
         self.workforce_id = self._generate_workforce_id()
+        self.workspace = _config.get_workspace()
         
         # Register all agents
         self.register_agents()
         
         print(f"\n{'='*60}")
-        print(f"🎯 Bob's Teams Methodz - The Only Methodz")
+        print(f"🎯 {self.BRAND} - {self.TAGLINE}")
         print(f"{'='*60}\n")
         self.print_team_status()
     
@@ -40,6 +46,10 @@ class WorkforceEngine:
         """Generate unique workforce ID"""
         import datetime
         return f"WF-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    
+    def _pkg_path(self, *parts) -> str:
+        """Build a path inside the bobs_teams_methodz package directory"""
+        return os.path.join(self.workspace, self.PACKAGE_DIR, *parts)
     
     def register_agents(self):
         """Register all available agents"""
@@ -102,15 +112,31 @@ class WorkforceEngine:
         print(f"🔄 Autonomous Execution Mode")
         print(f"{'='*60}\n")
         
+        # If no task_id provided, use the most recent task
+        if task_id is None:
+            if self.task_manager.tasks:
+                task_id = list(self.task_manager.tasks.keys())[-1]
+            else:
+                print("❌ No task to execute. Submit a task first.")
+                return None
+        
         # Step 1: Plan the project
         print(f"Step 1/4: Planning Project")
         print(f"{'─'*60}")
         project_plan = self.plan_project(task_id)
         
+        if not project_plan:
+            print("❌ Project planning failed. Aborting execution.")
+            return None
+        
         # Step 2: Decompose tasks
         print(f"\nStep 2/4: Decomposing Tasks")
         print(f"{'─'*60}")
         tasks = self.decompose_tasks(project_plan)
+        
+        if not tasks:
+            print("⚠️ No tasks decomposed. Delivering plan as-is.")
+            return self.assemble_deliverable({}, project_plan)
         
         # Step 3: Execute tasks
         print(f"\nStep 3/4: Executing Tasks")
@@ -129,7 +155,7 @@ class WorkforceEngine:
         
         return deliverable
     
-    def plan_project(self, task_id: str) -> Dict[str, Any]:
+    def plan_project(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Plan the project using Project Manager"""
         
         task = self.task_manager.get_task(task_id)
@@ -143,13 +169,16 @@ class WorkforceEngine:
         # Get Project Manager agent
         pm_agent = self.task_manager.agents.get("ProjectManager")
         
+        if not pm_agent:
+            print("❌ Project Manager agent not found")
+            return None
+        
         # Create planning task
         planning_task = {
             "task_id": f"{task_id}_plan",
             "type": "project_plan",
             "description": task.description,
-            "requirements": task.requirements,
-            "requirements": {}
+            "requirements": task.requirements or {}
         }
         
         # Execute planning
@@ -165,7 +194,7 @@ class WorkforceEngine:
             
             return project_plan
         else:
-            print(f"  ❌ Failed to create project plan")
+            print(f"  ❌ Failed to create project plan: {result.get('error', 'Unknown error')}")
             return None
     
     def decompose_tasks(self, project_plan: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -178,31 +207,35 @@ class WorkforceEngine:
         phases = project_plan.get("phases", [])
         
         for phase in phases:
+            phase_num = phase.get("phase", 0)
+            phase_name = phase.get("name", "Unnamed Phase")
             phase_tasks = phase.get("tasks", [])
             task_count = 0
             
             for task_def in phase_tasks:
+                task_key = task_def.get("task_id", f"task_{task_count}")
+                
                 # Create task in task manager
-                task_id = f"{self.workforce_id}_phase{phase['phase']}_{task_def['task_id']}"
+                task_id = f"{self.workforce_id}_phase{phase_num}_{task_key}"
                 
                 self.task_manager.create_task(
                     task_id=task_id,
-                    description=task_def["description"],
+                    description=task_def.get("description", ""),
                     task_type="general",
-                    requirements={"agent": task_def["agent"]}
+                    requirements={"agent": task_def.get("agent", "Developer")}
                 )
                 
                 tasks.append({
                     "task_id": task_id,
-                    "description": task_def["description"],
-                    "agent": task_def["agent"],
-                    "phase": phase["phase"],
-                    "phase_name": phase["name"]
+                    "description": task_def.get("description", ""),
+                    "agent": task_def.get("agent", "Developer"),
+                    "phase": phase_num,
+                    "phase_name": phase_name
                 })
                 
                 task_count += 1
             
-            print(f"  📦 Phase {phase['phase']} ({phase['name']}): {task_count} tasks")
+            print(f"  📦 Phase {phase_num} ({phase_name}): {task_count} tasks")
         
         print(f"  ✅ Total tasks decomposed: {len(tasks)}")
         return tasks
@@ -220,6 +253,10 @@ class WorkforceEngine:
             agent = self.task_manager.agents.get(task_def["agent"])
             if not agent:
                 print(f"  ❌ Agent not found: {task_def['agent']}")
+                results[task_def["task_id"]] = {
+                    "success": False,
+                    "error": f"Agent {task_def['agent']} not found"
+                }
                 continue
             
             # Update task status
@@ -234,22 +271,28 @@ class WorkforceEngine:
                 "requirements": {}
             }
             
-            result = agent.process_task(task_data)
-            
-            # Save result
-            if result.get("success"):
-                print(f"  ✅ Task completed")
-                self.task_manager.update_task_status(task_id, TaskStatus.COMPLETED, result)
+            try:
+                result = agent.process_task(task_data)
                 
-                # Report progress
-                progress = self.task_manager.get_progress_summary()
-                print(f"  📊 Progress: {progress['progress_percentage']:.1f}% ({progress['completed']}/{progress['total_tasks']})")
-                
-                results[task_id] = result
-            else:
-                print(f"  ❌ Task failed: {result.get('error')}")
-                self.task_manager.update_task_status(task_id, TaskStatus.FAILED, error=result.get("error"))
-                results[task_id] = result
+                # Save result
+                if result.get("success"):
+                    print(f"  ✅ Task completed")
+                    self.task_manager.update_task_status(task_id, TaskStatus.COMPLETED, result)
+                    
+                    # Report progress
+                    progress = self.task_manager.get_progress_summary()
+                    print(f"  📊 Progress: {progress['progress_percentage']:.1f}% ({progress['completed']}/{progress['total_tasks']})")
+                    
+                    results[task_id] = result
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    print(f"  ❌ Task failed: {error_msg}")
+                    self.task_manager.update_task_status(task_id, TaskStatus.FAILED, error=error_msg)
+                    results[task_id] = result
+            except Exception as e:
+                print(f"  ❌ Task exception: {str(e)}")
+                self.task_manager.update_task_status(task_id, TaskStatus.FAILED, error=str(e))
+                results[task_id] = {"success": False, "error": str(e)}
             
             # Check if user wants to be notified
             if self.keep_in_loop and (i % 3 == 0 or i == len(tasks)):
@@ -261,17 +304,21 @@ class WorkforceEngine:
         """Assemble final deliverable from all results"""
         
         # Create deliverable directory
-        deliverable_dir = os.path.join(self.task_manager.workspace, "ai_workforce", "deliverables", self.workforce_id)
+        deliverable_dir = self._pkg_path("deliverables", self.workforce_id)
         os.makedirs(deliverable_dir, exist_ok=True)
         
         # Create summary report
+        total_results = len(results)
+        completed_count = sum(1 for r in results.values() if r.get("success"))
+        failed_count = sum(1 for r in results.values() if not r.get("success"))
+        
         report = {
             "workforce_id": self.workforce_id,
             "project_goal": project_plan.get("project_goal", "") if project_plan else "",
             "execution_summary": {
-                "total_tasks": len(results),
-                "completed": sum(1 for r in results.values() if r.get("success")),
-                "failed": sum(1 for r in results.values() if not r.get("success"))
+                "total_tasks": total_results,
+                "completed": completed_count,
+                "failed": failed_count
             },
             "results_by_phase": {},
             "deliverables": []
@@ -279,28 +326,31 @@ class WorkforceEngine:
         
         # Group results by phase
         for task_id, result in results.items():
-            # Extract phase from task_id
             parts = task_id.split("_")
             if len(parts) >= 3:
-                phase = parts[2]  # phase1, phase2, etc.
+                phase = parts[2]
                 if phase not in report["results_by_phase"]:
                     report["results_by_phase"][phase] = []
                 report["results_by_phase"][phase].append(result)
         
         # Save report
         report_file = os.path.join(deliverable_dir, "execution_report.json")
-        with open(report_file, "w") as f:
-            json.dump(report, f, indent=2)
-        
-        print(f"  📄 Execution report saved: {report_file}")
+        try:
+            with open(report_file, "w") as f:
+                json.dump(report, f, indent=2)
+            print(f"  📄 Execution report saved: {report_file}")
+        except (OSError, IOError) as e:
+            print(f"  ⚠️ Could not save report: {e}")
         
         # Create human-readable report
         human_report = self._generate_human_report(report)
         human_report_file = os.path.join(deliverable_dir, "report.md")
-        with open(human_report_file, "w") as f:
-            f.write(human_report)
-        
-        print(f"  📄 Human-readable report: {human_report_file}")
+        try:
+            with open(human_report_file, "w") as f:
+                f.write(human_report)
+            print(f"  📄 Human-readable report: {human_report_file}")
+        except (OSError, IOError) as e:
+            print(f"  ⚠️ Could not save report: {e}")
         
         return deliverable_dir
     
@@ -308,7 +358,7 @@ class WorkforceEngine:
         """Generate human-readable markdown report"""
         
         lines = []
-        lines.append(f"# AI Workforce Execution Report")
+        lines.append(f"# {self.BRAND} - Execution Report")
         lines.append(f"\n**Workforce ID:** {report['workforce_id']}")
         lines.append(f"**Project Goal:** {report['project_goal']}")
         lines.append(f"\n---\n")
@@ -323,23 +373,26 @@ class WorkforceEngine:
         lines.append(f"- **Success Rate:** {success_rate:.1f}%")
         
         # Phase Results
-        lines.append(f"\n## Results by Phase")
-        for phase, results in report['results_by_phase'].items():
-            lines.append(f"\n### {phase}")
-            for result in results:
-                lines.append(f"- ✅ Task completed")
+        if report.get('results_by_phase'):
+            lines.append(f"\n## Results by Phase")
+            for phase, results in report['results_by_phase'].items():
+                lines.append(f"\n### {phase}")
+                for result in results:
+                    status = "✅" if result.get("success") else "❌"
+                    lines.append(f"- {status} Task completed")
         
         # Deliverables
-        lines.append(f"\n## Deliverables")
-        for deliverable in report['deliverables']:
-            lines.append(f"- {deliverable}")
+        if report.get('deliverables'):
+            lines.append(f"\n## Deliverables")
+            for deliverable in report['deliverables']:
+                lines.append(f"- {deliverable}")
         
         lines.append(f"\n---\n")
-        lines.append(f"*Generated by AI Workforce Team*")
+        lines.append(f"*Generated by {self.BRAND} - {self.TAGLINE}*")
         
         return "\n".join(lines)
     
-    def show_summary(self, results: Dict[str, Any]):
+    def show_summary(self, results: Dict[str, Any] = None):
         """Show progress summary"""
         
         progress = self.task_manager.get_progress_summary()
@@ -359,6 +412,6 @@ class WorkforceEngine:
         return {
             "workforce_id": self.workforce_id,
             "progress": self.task_manager.get_progress_summary(),
-            "tasks": self.task_manager.tasks,
+            "tasks": {tid: t.to_dict() for tid, t in self.task_manager.tasks.items()},
             "context": self.task_manager.get_context()
         }

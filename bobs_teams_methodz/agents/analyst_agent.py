@@ -1,15 +1,11 @@
 """
-Analyst Agent
+Analyst Agent for Bob's Teams Methodz
 Specializes in data analysis, insights, and reporting
 """
 
 from typing import Dict, Any, List
 import json
 import os
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ..agent_base import AgentBase
 
@@ -70,7 +66,6 @@ class AnalystAgent(AgentBase):
             "task_id": task.get("task_id")
         }
         
-        # If data is provided directly
         if task.get("data"):
             data = task.get("data")
             analysis_result = self._perform_analysis(data, analysis_type)
@@ -121,14 +116,12 @@ class AnalystAgent(AgentBase):
             "recommendations": []
         }
         
-        # Generate report content
         if data:
             report_content = self._generate_report_content(data, report_type)
             report_structure["content"] = report_content["content"]
             report_structure["summary"] = report_content["summary"]
             report_structure["recommendations"] = report_content["recommendations"]
         
-        # Save report if path specified
         file_path = task.get("file_path")
         if file_path:
             report_text = self._format_report_as_text(report_structure)
@@ -176,7 +169,6 @@ class AnalystAgent(AgentBase):
             "tools_needed": []
         }
         
-        # Provide recommendations based on task
         if "sales" in description.lower():
             analysis_plan["recommended_approach"].extend([
                 "Analyze sales trends over time",
@@ -219,7 +211,6 @@ class AnalystAgent(AgentBase):
         }
         
         if isinstance(data, list) and len(data) > 0:
-            # Analyze list data
             result["metrics"].append({
                 "name": "Count",
                 "value": len(data)
@@ -248,21 +239,19 @@ class AnalystAgent(AgentBase):
             "anomalies": []
         }
         
-        if len(data) >= 3:
-            # Simple trend detection
-            if isinstance(data[0], (int, float)):
-                first_half = data[:len(data)//2]
-                second_half = data[len(data)//2:]
-                
-                avg_first = sum(first_half) / len(first_half)
-                avg_second = sum(second_half) / len(second_half)
-                
-                if avg_second > avg_first * 1.1:
-                    trend_analysis["trends"].append("Upward trend detected")
-                elif avg_second < avg_first * 0.9:
-                    trend_analysis["trends"].append("Downward trend detected")
-                else:
-                    trend_analysis["trends"].append("Stable trend")
+        if len(data) >= 3 and isinstance(data[0], (int, float)):
+            first_half = data[:len(data)//2]
+            second_half = data[len(data)//2:]
+            
+            avg_first = sum(first_half) / len(first_half) if first_half else 0
+            avg_second = sum(second_half) / len(second_half) if second_half else 0
+            
+            if avg_second > avg_first * 1.1:
+                trend_analysis["trends"].append("Upward trend detected")
+            elif avg_second < avg_first * 0.9:
+                trend_analysis["trends"].append("Downward trend detected")
+            else:
+                trend_analysis["trends"].append("Stable trend")
         
         return trend_analysis
     
@@ -273,15 +262,15 @@ class AnalystAgent(AgentBase):
             "detailed": ["Introduction", "Methodology", "Findings", "Analysis", "Conclusions", "Recommendations"],
             "dashboard": ["Overview", "Metrics", "Trends", "Insights", "Actions"]
         }
-        
         return sections.get(report_type, sections["summary"])
     
     def _generate_report_content(self, data: Dict[str, Any], report_type: str) -> Dict[str, Any]:
         """Generate report content"""
+        data_points = len(data) if isinstance(data, (list, dict)) else 1
         return {
             "content": {
                 "introduction": "This report presents an analysis of the provided data.",
-                "findings": f"Analysis completed on {len(data) if isinstance(data, (list, dict)) else 1} data points."
+                "findings": f"Analysis completed on {data_points} data points."
             },
             "summary": "Data analysis completed successfully.",
             "recommendations": ["Continue monitoring data trends", "Investigate anomalies", "Optimize based on findings"]
@@ -297,7 +286,6 @@ class AnalystAgent(AgentBase):
             "actionable_items": []
         }
         
-        # Extract insights based on data structure
         if isinstance(data, dict):
             for key, value in data.items():
                 if isinstance(value, (int, float)):
@@ -310,7 +298,7 @@ class AnalystAgent(AgentBase):
     def _format_report_as_text(self, report: Dict[str, Any]) -> str:
         """Format report as text"""
         lines = []
-        lines.append(f"# {report['title']}")
+        lines.append(f"# {report.get('title', 'Report')}")
         lines.append("")
         
         if report.get("summary"):

@@ -6,11 +6,14 @@ The Only Methodz - Easy-to-use interface for autonomous AI collaboration
 
 import sys
 import os
+import json
 
 # Add workspace to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Centralized config loads .env via python-dotenv automatically
 from bobs_teams_methodz import BobsTeams
+from bobs_teams_methodz import config as _config
 
 
 def print_banner():
@@ -45,7 +48,11 @@ def interactive_mode():
 
     while True:
         print_menu()
-        choice = input("Enter your choice (0-6): ").strip()
+        try:
+            choice = input("Enter your choice (0-6): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print(f"\n👋 Thanks for using Bob's Teams Methodz! 🎯")
+            break
 
         if choice == "0":
             print(f"\n👋 Thanks for using Bob's Teams Methodz! 🎯")
@@ -59,12 +66,20 @@ def interactive_mode():
             print(f"\n📝 Submit New Task (Interactive Mode)")
             print(f"{'='*70}")
             
-            description = input("Task description: ").strip()
+            try:
+                description = input("Task description: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print(f"\n🔙 Returning to menu.")
+                continue
+            
             if not description:
                 print(f"❌ Task description cannot be empty")
                 continue
             
-            task_type = input("Task type (press Enter for 'general'): ").strip() or "general"
+            try:
+                task_type = input("Task type (press Enter for 'general'): ").strip() or "general"
+            except (EOFError, KeyboardInterrupt):
+                task_type = "general"
             
             # Submit task
             task_id = team.submit_task(description, task_type)
@@ -76,17 +91,25 @@ def interactive_mode():
         elif choice == "2":
             # Autonomous mode
             if team is None:
-                team = WorkforceEngine(keep_in_loop=False)
+                team = BobsTeams(keep_in_loop=False)
             
             print(f"\n📝 Submit New Task (Autonomous Mode)")
             print(f"{'='*70}")
             
-            description = input("Task description: ").strip()
+            try:
+                description = input("Task description: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print(f"\n🔙 Returning to menu.")
+                continue
+            
             if not description:
                 print(f"❌ Task description cannot be empty")
                 continue
             
-            task_type = input("Task type (press Enter for 'general'): ").strip() or "general"
+            try:
+                task_type = input("Task type (press Enter for 'general'): ").strip() or "general"
+            except (EOFError, KeyboardInterrupt):
+                task_type = "general"
             
             # Submit and execute
             print(f"\n🚀 Starting autonomous execution...")
@@ -96,7 +119,7 @@ def interactive_mode():
         elif choice == "3":
             # View team status
             if team is None:
-                team = WorkforceEngine()
+                team = BobsTeams()
             else:
                 team.print_team_status()
         
@@ -115,12 +138,15 @@ def interactive_mode():
                 results = team.get_results()
                 print(f"\n📊 Execution Results")
                 print(f"{'='*70}")
-                print(f"\n{json.dumps(results, indent=2)}\n")
+                try:
+                    print(f"\n{json.dumps(results, indent=2, default=str)}\n")
+                except (TypeError, ValueError) as e:
+                    print(f"\n⚠️ Could not serialize results: {e}\n")
         
         elif choice == "6":
             # Reset team
-            team = WorkforceEngine()
-            print(f"\n✅ Workforce reset successfully!\n")
+            team = BobsTeams()
+            print(f"\n✅ Team reset successfully!\n")
         
         else:
             print(f"\n❌ Invalid choice. Please enter 0-6.\n")
@@ -134,15 +160,19 @@ def quick_demo():
     print(f"🎬 Quick Demo Mode")
     print(f"{'='*70}")
     print(f"This demo will:")
-    print(f"  1. Create an AI team team")
+    print(f"  1. Create an AI team")
     print(f"  2. Submit a sample task")
     print(f"  3. Execute tasks autonomously")
     print(f"  4. Deliver results")
     print(f"\nPress Enter to continue or Ctrl+C to cancel...")
-    input()
+    try:
+        input()
+    except (EOFError, KeyboardInterrupt):
+        print(f"\nDemo cancelled.")
+        return
     
     # Initialize team
-    team = WorkforceEngine(keep_in_loop=False)
+    team = BobsTeams(keep_in_loop=False)
     
     # Submit sample task
     sample_task = "Create a research report on renewable energy trends"

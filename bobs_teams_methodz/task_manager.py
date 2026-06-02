@@ -9,6 +9,8 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from enum import Enum
 
+from . import config as _config
+
 
 class TaskStatus(Enum):
     """Task status enumeration"""
@@ -58,8 +60,10 @@ class Task:
 class TaskManager:
     """Manages tasks, agents, and coordination"""
     
-    def __init__(self, workspace: str = "/workspace"):
-        self.workspace = workspace
+    PACKAGE_DIR = _config.PACKAGE_DIR
+    
+    def __init__(self, workspace: str = None):
+        self.workspace = workspace or _config.get_workspace()
         self.tasks: Dict[str, Task] = {}
         self.agents = {}
         self.task_queue: List[str] = []
@@ -68,18 +72,22 @@ class TaskManager:
         
         self.setup_directories()
     
+    def _pkg_path(self, *parts) -> str:
+        """Build a path inside the bobs_teams_methodz package directory"""
+        return os.path.join(self.workspace, self.PACKAGE_DIR, *parts)
+    
     def setup_directories(self):
         """Create necessary directories"""
         dirs = [
-            "bobs_teams_methodz/logs",
-            "bobs_teams_methodz/results",
-            "bobs_teams_methodz/context",
-            "bobs_teams_methodz/tasks",
-            "bobs_teams_methodz/deliverables"
+            "logs",
+            "results",
+            "context",
+            "tasks",
+            "deliverables"
         ]
         
-        for dir_path in dirs:
-            os.makedirs(os.path.join(self.workspace, dir_path), exist_ok=True)
+        for dir_name in dirs:
+            os.makedirs(self._pkg_path(dir_name), exist_ok=True)
     
     def register_agent(self, agent):
         """Register an agent with the task manager"""
@@ -130,7 +138,8 @@ class TaskManager:
             task.result = result
             if task_id in self.task_queue:
                 self.task_queue.remove(task_id)
-            self.completed_tasks.append(task_id)
+            if task_id not in self.completed_tasks:
+                self.completed_tasks.append(task_id)
         
         if status == TaskStatus.FAILED:
             task.error = error
@@ -141,7 +150,6 @@ class TaskManager:
     
     def get_next_task(self, agent_name: str) -> Optional[Task]:
         """Get the next task for an agent"""
-        # Check for tasks that can be started (dependencies met)
         available_tasks = []
         
         for task_id in self.task_queue:
@@ -159,8 +167,7 @@ class TaskManager:
         if not available_tasks:
             return None
         
-        # Select task based on agent capabilities (simple version - first available)
-        # In a more sophisticated version, would match capabilities to task type
+        # Select first available task
         task = available_tasks[0]
         self.assign_task(task.task_id, agent_name)
         
@@ -168,7 +175,7 @@ class TaskManager:
     
     def save_tasks(self):
         """Save tasks to file"""
-        tasks_file = os.path.join(self.workspace, "ai_workforce", "tasks", "active_tasks.json")
+        tasks_file = self._pkg_path("tasks", "active_tasks.json")
         
         tasks_data = {
             "tasks": {task_id: task.to_dict() for task_id, task in self.tasks.items()},
@@ -176,48 +183,61 @@ class TaskManager:
             "completed": self.completed_tasks
         }
         
-        with open(tasks_file, "w") as f:
-            json.dump(tasks_data, f, indent=2)
+        try:
+            with open(tasks_file, "w") as f:
+                json.dump(tasks_data, f, indent=2)
+        except (OSError, IOError) as e:
+            print(f"[TaskManager] Warning: Could not save tasks: {e}")
     
     def load_tasks(self):
         """Load tasks from file"""
-        tasks_file = os.path.join(self.workspace, "ai_workforce", "tasks", "active_tasks.json")
+        tasks_file = self._pkg_path("tasks", "active_tasks.json")
         
         if not os.path.exists(tasks_file):
             return
         
-        with open(tasks_file, "r") as f:
-            tasks_data = json.load(f)
+        try:
+            with open(tasks_file, "r") as f:
+                tasks_data = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"[TaskManager] Warning: Could not load tasks: {e}")
+            return
         
         self.tasks = {}
-        for task_id, task_data in tasks_data["tasks"].items():
-            task = Task(
-                task_id,
-                task_data["description"],
-                task_data["type"],
-                task_data["requirements"],
-                task_data["dependencies"]
-            )
-            task.status = TaskStatus(task_data["status"])
-            task.assigned_agent = task_data["assigned_agent"]
-            task.created_at = task_data["created_at"]
-            task.started_at = task_data["started_at"]
-            task.completed_at = task_data["completed_at"]
-            task.result = task_data["result"]
-            task.error = task_data["error"]
-            
-            self.tasks[task_id] = task
+        for task_id, task_data in tasks_data.get("tasks", {}).items():
+            try:
+                task = Task(
+                    task_id,
+                    task_data.get("description", ""),
+                    task_data.get("type", "general"),
+                    task_data.get("requirements", {}),
+                    task_data.get("dependencies", [])
+                )
+                task.status = TaskStatus(task_data.get("status", "pending"))
+                task.assigned_agent = task_data.get("assigned_agent")
+                task.created_at = task_data.get("created_at")
+                task.started_at = task_data.get("started_at")
+                task.completed_at = task_data.get("completed_at")
+                task.result = task_data.get("result")
+                task.error = task_data.get("error")
+                
+                self.tasks[task_id] = task
+            except (ValueError, KeyError) as e:
+                print(f"[TaskManager] Warning: Could not load task {task_id}: {e}")
         
-        self.task_queue = tasks_data["queue"]
-        self.completed_tasks = tasks_data["completed"]
+        self.task_queue = tasks_data.get("queue", [])
+        self.completed_tasks = tasks_data.get("completed", [])
     
     def update_context(self, key: str, value: Any):
         """Update global context"""
         self.context[key] = value
         
-        context_file = os.path.join(self.workspace, "ai_workforce", "context", "global_context.json")
-        with open(context_file, "w") as f:
-            json.dump(self.context, f, indent=2)
+        context_file = self._pkg_path("context", "global_context.json")
+        try:
+            with open(context_file, "w") as f:
+                json.dump(self.context, f, indent=2)
+        except (OSError, IOError) as e:
+            print(f"[TaskManager] Warning: Could not save context: {e}")
     
     def get_context(self, key: str = None) -> Any:
         """Get context value or entire context"""

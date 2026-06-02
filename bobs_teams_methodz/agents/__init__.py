@@ -1,5 +1,5 @@
 """
-AI Workforce Agents Package
+Bob's Teams Methodz Agents Package
 Contains all specialized agents
 """
 

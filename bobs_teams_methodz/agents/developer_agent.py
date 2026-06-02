@@ -1,15 +1,11 @@
 """
-Developer Agent
+Developer Agent for Bob's Teams Methodz
 Specializes in code generation, testing, and deployment
 """
 
 from typing import Dict, Any
 import json
 import os
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ..agent_base import AgentBase
 
@@ -70,18 +66,12 @@ class DeveloperAgent(AgentBase):
             "requirements": requirements,
             "code": "",
             "file_path": requirements.get("file_path", ""),
-            "dependencies": []
+            "dependencies": [],
+            "needs_generation": True,
+            "task_id": task.get("task_id")
         }
         
-        # Mark that code generation is needed
-        # The actual generation will be done by the main AI system
-        code_spec["needs_generation"] = True
-        code_spec["task_id"] = task.get("task_id")
-        
-        # Save spec for later use
-        spec_file = os.path.join(self.workspace, "ai_workforce", "context", f"code_spec_{task.get('task_id')}.json")
-        with open(spec_file, "w") as f:
-            json.dump(code_spec, f, indent=2)
+        self.save_context(f"code_spec_{task.get('task_id')}.json", code_spec)
         
         return {
             "action_required": "generate_code",
@@ -112,11 +102,9 @@ class DeveloperAgent(AgentBase):
             "quality_score": 0
         }
         
-        # Basic code review
         lines = code_content.split("\n")
         
         for i, line in enumerate(lines, 1):
-            # Check for common issues
             if "TODO" in line or "FIXME" in line:
                 review_result["issues"].append({
                     "line": i,
@@ -131,7 +119,6 @@ class DeveloperAgent(AgentBase):
                     "message": "Line exceeds 120 characters"
                 })
         
-        # Calculate quality score (simplified)
         base_score = 100
         review_result["quality_score"] = max(0, base_score - len(review_result["issues"]) * 5)
         
@@ -147,16 +134,6 @@ class DeveloperAgent(AgentBase):
         
         self.log(f"Running {test_type} tests on {len(test_files)} files")
         
-        test_result = {
-            "test_type": test_type,
-            "files_tested": [],
-            "tests_passed": 0,
-            "tests_failed": 0,
-            "coverage": 0,
-            "output": ""
-        }
-        
-        # Trigger test execution
         test_params = {
             "action": "run_tests",
             "test_type": test_type,
@@ -164,9 +141,7 @@ class DeveloperAgent(AgentBase):
             "task_id": task.get("task_id")
         }
         
-        params_file = os.path.join(self.workspace, "ai_workforce", "context", f"test_{task.get('task_id')}.json")
-        with open(params_file, "w") as f:
-            json.dump(test_params, f, indent=2)
+        self.save_context(f"test_{task.get('task_id')}.json", test_params)
         
         return {
             "action_required": "run_tests",
@@ -219,7 +194,6 @@ class DeveloperAgent(AgentBase):
         
         self.log(f"Providing development assistance: {description}")
         
-        # Create development plan
         dev_plan = {
             "task": description,
             "steps": [
@@ -232,7 +206,6 @@ class DeveloperAgent(AgentBase):
             "recommended_actions": []
         }
         
-        # Add specific recommendations based on task
         if "web" in description.lower():
             dev_plan["recommended_actions"].append("Create HTML/CSS/JS files")
             dev_plan["recommended_actions"].append("Test browser compatibility")

@@ -1,15 +1,11 @@
 """
-Writer Agent
+Writer Agent for Bob's Teams Methodz
 Specializes in content creation, documentation, and writing
 """
 
 from typing import Dict, Any
 import json
 import os
-import sys
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ..agent_base import AgentBase
 
@@ -74,16 +70,11 @@ class WriterAgent(AgentBase):
             "requirements": requirements,
             "content": "",
             "file_path": requirements.get("file_path", ""),
-            "task_id": task.get("task_id")
+            "task_id": task.get("task_id"),
+            "needs_creation": True
         }
         
-        # Mark that content creation is needed
-        content_spec["needs_creation"] = True
-        
-        # Save spec for later use
-        spec_file = os.path.join(self.workspace, "ai_workforce", "context", f"content_spec_{task.get('task_id')}.json")
-        with open(spec_file, "w") as f:
-            json.dump(content_spec, f, indent=2)
+        self.save_context(f"content_spec_{task.get('task_id')}.json", content_spec)
         
         return {
             "action_required": "create_content",
@@ -107,14 +98,11 @@ class WriterAgent(AgentBase):
             "structure": doc_structure,
             "content": {},
             "file_path": task.get("file_path", ""),
-            "task_id": task.get("task_id")
+            "task_id": task.get("task_id"),
+            "needs_creation": True
         }
         
-        doc_spec["needs_creation"] = True
-        
-        spec_file = os.path.join(self.workspace, "ai_workforce", "context", f"doc_spec_{task.get('task_id')}.json")
-        with open(spec_file, "w") as f:
-            json.dump(doc_spec, f, indent=2)
+        self.save_context(f"doc_spec_{task.get('task_id')}.json", doc_spec)
         
         return {
             "action_required": "create_documentation",
@@ -132,7 +120,6 @@ class WriterAgent(AgentBase):
         
         summary = self._generate_summary(source_content, summary_type)
         
-        # Save summary to file if path specified
         file_path = task.get("file_path")
         if file_path:
             self.save_file_content(file_path, summary)
@@ -154,7 +141,6 @@ class WriterAgent(AgentBase):
         
         edited_content = self._edit_content(content, edit_type)
         
-        # Save edited content if path specified
         file_path = task.get("file_path")
         if file_path:
             self.save_file_content(file_path, edited_content)
@@ -184,7 +170,6 @@ class WriterAgent(AgentBase):
             "outline": []
         }
         
-        # Analyze task and provide suggestions
         if "article" in description.lower():
             writing_plan["outline"] = [
                 "Introduction",
@@ -259,47 +244,36 @@ class WriterAgent(AgentBase):
             return ""
         
         if summary_type == "executive":
-            # Executive summary: brief, high-level
             sentences = content.split(". ")
             key_sentences = sentences[:3]
             return ". ".join(key_sentences) + "."
         
         elif summary_type == "detailed":
-            # Detailed summary: more comprehensive
             paragraphs = content.split("\n\n")
             if len(paragraphs) >= 2:
                 return paragraphs[0] + "\n\n" + paragraphs[-1]
-            return content[:500] + "..."
+            return content[:500] + "..." if len(content) > 500 else content
         
         else:
-            # Standard summary
-            return content[:300] + "..."
+            return content[:300] + "..." if len(content) > 300 else content
     
     def _edit_content(self, content: str, edit_type: str) -> str:
         """Edit content based on type"""
         if edit_type == "proofread":
-            # Basic proofreading
-            # Fix common issues (simplified)
-            edited = content.replace("  ", " ")  # Double spaces
-            edited = edited.replace("\n\n\n", "\n\n")  # Multiple blank lines
+            edited = content.replace("  ", " ")
+            edited = edited.replace("\n\n\n", "\n\n")
             return edited
         
-        elif edit_type == "style":
-            # Style improvements
-            # Add transitional phrases where needed
-            return content
-        
-        else:
-            return content
+        return content
     
     def _count_grammar_fixes(self, original: str, edited: str) -> int:
-        """Count grammar fixes (simplified)"""
+        """Count grammar fixes"""
         return abs(len(original.split()) - len(edited.split()))
     
     def _count_style_improvements(self, original: str, edited: str) -> int:
         """Count style improvements"""
-        return 0  # Placeholder
+        return 0
     
     def _count_clarity_changes(self, original: str, edited: str) -> int:
         """Count clarity enhancements"""
-        return 0  # Placeholder
+        return 0
