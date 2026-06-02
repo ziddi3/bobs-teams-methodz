@@ -1,0 +1,61 @@
+# Bob's Teams Methodz - Git Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Bob's Teams Methodz specific
+outputs/
+*.log
+deliverables/*
+!deliverables/.gitkeep
+tasks/*
+!tasks/.gitkeep
+context/*
+!context/.gitkeep
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Browser data
+.browser_data/
+.psiphon_data/
+
+# Generated images (keep bob_icon.png)
+generated_images/
+!bobs_teams_methodz/bob_icon.png
+
+# Memory and session files
+memory.md
+.summarized_conversations/
